@@ -644,6 +644,14 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
          
             self.filepath = filepath
 
+        if obj and obj.animation_data and obj.animation_data.action:
+            action = obj.animation_data.action
+            start = action.frame_range[0]
+            end = action.frame_range[1]
+            context.scene.frame_start = int(start)
+            context.scene.frame_end = int(end)
+        
+
         return super().invoke(context, event)
 
 
