@@ -55,7 +55,7 @@ def get_master_name(context):
         return None
 
 def get_all_actions(obj):
-    actions = []
+    actions = set()
 
     # Get action from object animation data
     if obj.animation_data:
@@ -65,8 +65,8 @@ def get_all_actions(obj):
         # Get all actions from NLA tracks
         for nla_track in obj.animation_data.nla_tracks:
             for strip in nla_track.strips:
-                if strip.action:
-                    actions.append(strip.action)
+                if strip.action and strip.action not in actions:
+                    actions.add(strip.action)
 
     return actions
 

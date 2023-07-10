@@ -3244,6 +3244,7 @@ def save(operator, context,
             
             wm.progress_end()
             
+            operator.report({'INFO'}, "Exported " + str(len(actions)) + " actions: " + '\n'.join([a.name for a in actions]))
             
     else:
         # XXX We need a way to generate a depsgraph for inactive view_layers first...
