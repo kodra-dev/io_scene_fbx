@@ -611,6 +611,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Prefix for action names to export in 'Ko Actions' batch mode",
             default="CLIP_",
     )
+    ko_master_name: StringProperty(
+            name="Ko Master Name",
+            description="Name of the master collection that would be prepended to the exported Ko Actions file names",
+            default="",
+    )
     use_batch_own_dir: BoolProperty(
             name="Batch Own Dir",
             description="Create a dir for each exported file",
@@ -633,6 +638,9 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     def invoke(self, context, event):
         import os
 
+        if not self.ko_master_name:
+            self.ko_master_name = get_master_name(context)
+
         # Get the directory of self.filepath, if it exists.
         if self.filepath:
             export_dir = os.path.dirname(self.filepath)
@@ -641,36 +649,30 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             export_dir = os.path.dirname(bpy.data.filepath)
             export_dir = to_hdg_directory_if_exists(export_dir)
 
-        # Get the current object's current action's name, if any
-        action_name = ""
         obj = context.object
-        if obj and obj.animation_data and obj.animation_data.action:
-            action_name = obj.animation_data.action.name
-        
-        if action_name:
-            # Get current collection name
-            collection_name = ""
-            if context.collection:
-                collection_name = context.collection.name
-                
-            # Append the action name to the directory
-            filename = f"{collection_name}_{action_name}" + ".fbx"
-            filepath = os.path.join(export_dir, filename)
-         
-            self.filepath = filepath
-
+        action = None
         if obj and obj.animation_data and obj.animation_data.action:
             action = obj.animation_data.action
-            start = action.frame_range[0]
-            end = action.frame_range[1]
-            context.scene.frame_start = int(start)
-            context.scene.frame_end = int(end)
-        
+        if self.bake_anim and action:
+            self.filepath = action_to_export_path(action, self.ko_master_name, export_dir)
+        else:
+            self.filepath = os.path.join(export_dir, self.ko_master_name + ".fbx")
 
         return super().invoke(context, event)
 
 
     def execute(self, context):
+        obj = context.object
+        if self.batch_mode == 'OFF':
+            action = None
+            if obj and obj.animation_data and obj.animation_data.action:
+                action = obj.animation_data.action 
+                start = action.frame_range[0]
+                end = action.frame_range[1]
+                context.scene.frame_start = int(start)
+                context.scene.frame_end = int(end)
+        
+        
         from mathutils import Matrix
         if not self.filepath:
             raise Exception("filepath not set")
@@ -688,7 +690,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         keywords["global_matrix"] = global_matrix
 
         if self.toggle_ko_unity_objects:
-            toggle_visibility_for_ko_unity_objects(context, self.bake_anim)
+            toggle_visibility_for_ko_unity_objects(context, self.ko_master_name, self.bake_anim)
 
         # TODO: batch mode export for ko actions
         #       perhaps we should implement it in export_fbx_bin.py
@@ -698,19 +700,21 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         return export_fbx_bin.save(self, context, **keywords)
 
 
-def toggle_visibility_for_ko_unity_objects(context, for_clip):
+def toggle_visibility_for_ko_unity_objects(context, ko_master_name, for_clip):
     # For objects in current collection AND current view layer
     collection_objs = context.collection.all_objects
     view_layer_objs = context.view_layer.objects
 
-    collection_name = context.collection.name
-    
     for obj in collection_objs:
         if not (obj.name in view_layer_objs):
             continue
 
+        prefix = get_prefix(obj.name)
+        print("Name: " + obj.name + "  Prefix: " + str(prefix))
+
         if obj.type == 'ARMATURE':
-            if obj.name.startswith("DEF_") or obj.name.startswith("GAME_"):
+            if prefix == "DEF_" or prefix == "GAME_":
+                print("Exporting armature: " + obj.name)
                 obj.hide_set(False)
             else:
                 obj.hide_set(True)
@@ -721,8 +725,7 @@ def toggle_visibility_for_ko_unity_objects(context, for_clip):
             obj.hide_set(True)
             # If one of its ancestors (not limited to direct parent) is an armature
             if has_armature_ancestor(obj):
-                prefix = obj.name.split("_")[0]
-                if (not prefix) or (not prefix.isupper()) or prefix == collection_name or prefix == "GAME":
+                if (not prefix) or prefix == "GAME_":
                     obj.hide_set(False)
                     
 
@@ -771,6 +774,8 @@ class FBX_PT_export_main(bpy.types.Panel):
         else:
             sub = row.row(align=True)
             sub.prop(operator, "use_batch_own_dir", text="", icon='NEWFOLDER')
+        row = layout.row(align=True)
+        row.prop(operator, "ko_master_name")
 
 
 class FBX_PT_export_include(bpy.types.Panel):

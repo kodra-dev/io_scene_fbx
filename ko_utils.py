@@ -1,4 +1,6 @@
 import os
+import re
+
 
 
 # Convert a directory from "raw" to "asset"
@@ -29,3 +31,26 @@ def to_hdg_directory_if_exists(path):
     # If the new directory does not exist, or "Raw" was not in the path, return the original path
     return path
   
+
+def action_to_export_path(action, master_name, export_dir):
+    action_name = action.name if action.name else "clip"
+
+    # Append the action name to the directory
+    filename = f"{master_name}_{action_name}" + ".fbx"
+    filepath = os.path.join(export_dir, filename)
+    return filepath
+
+def get_prefix(s):
+    match = re.match(r'^([A-Z_]*_)', s)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+
+def get_master_name(context):
+    # Return the current collection name
+    if context.collection:
+        return context.collection.name
+    else:
+        return None
