@@ -386,6 +386,12 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Export only objects from the active collection (and its children)",
             default=False,
             )
+    toggle_ko_unity_objects: BoolProperty(
+            name="Ko Unity Objects",
+            description="Make all Ko Unity objects *in current collection* visible before exporting",
+            default=False,
+    )
+            
     global_scale: FloatProperty(
             name="Scale",
             description="Scale all data (Some importers do not support scaled armatures!)",
@@ -595,8 +601,14 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('ACTIVE_SCENE_COLLECTION', "Active Scene Collections",
                     "Each collection (including master, non-data-block one) of the active scene as a file, "
                     "including content from children collections"),
+                   ('KO_ACTIONS', "Ko Actions", "Each prefixed action as a file with auto-naming and auto-range."),
                    ),
             )
+    ko_actions_prefix: StringProperty(
+            name="Ko Action Prefix",
+            description="Prefix for action names to export in 'Ko Actions' batch mode",
+            default="CLIP_",
+    )
     use_batch_own_dir: BoolProperty(
             name="Batch Own Dir",
             description="Create a dir for each exported file",
@@ -672,8 +684,50 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
 
         keywords["global_matrix"] = global_matrix
 
+        if self.toggle_ko_unity_objects:
+            toggle_visibility_for_ko_unity_objects(context)
+
+        # TODO: batch mode export for ko actions
+        #       perhaps we should implement it in export_fbx_bin.py
+        #       and how to handle auto-range?
+
         from . import export_fbx_bin
         return export_fbx_bin.save(self, context, **keywords)
+
+
+def toggle_visibility_for_ko_unity_objects(context):
+    # For objects in current collection AND current view layer
+    collection_objs = context.collection.all_objects
+    view_layer_objs = context.view_layer.objects
+
+    collection_name = context.collection.name
+    
+    for obj in collection_objs:
+        if not (obj.name in view_layer_objs):
+            continue
+        # If obj is armature
+        obj.hide_set(True)
+        if obj.type == 'ARMATURE':
+            if obj.name.startswith("DEF_") or obj.name.startswith("GAME_"):
+                obj.hide_set(False)
+        elif obj.type == 'MESH':
+            # If one of its ancestors (not limited to direct parent) is an armature
+            # continue
+            if has_armature_ancestor(obj):
+                prefix = obj.name.split("_")[0]
+                if (not prefix) or (not prefix.isupper()) or prefix == collection_name or prefix == "GAME":
+                    print(obj.name, prefix)
+                    obj.hide_set(False)
+                    
+
+def has_armature_ancestor(obj):
+    if obj.parent is None:
+        return False
+    elif obj.parent.type == 'ARMATURE':
+        return True
+    else:
+        return has_armature_ancestor(obj.parent)
+                
 
 
 class FBX_PT_export_main(bpy.types.Panel):
@@ -705,8 +759,12 @@ class FBX_PT_export_main(bpy.types.Panel):
         sub.prop(operator, "embed_textures", text="", icon='PACKAGE' if operator.embed_textures else 'UGLYPACKAGE')
         row = layout.row(align=True)
         row.prop(operator, "batch_mode")
-        sub = row.row(align=True)
-        sub.prop(operator, "use_batch_own_dir", text="", icon='NEWFOLDER')
+        if operator.batch_mode == 'KO_ACTIONS':
+            row = layout.row(align=True)
+            row.prop(operator, "ko_actions_prefix")
+        else:
+            sub = row.row(align=True)
+            sub.prop(operator, "use_batch_own_dir", text="", icon='NEWFOLDER')
 
 
 class FBX_PT_export_include(bpy.types.Panel):
@@ -735,6 +793,7 @@ class FBX_PT_export_include(bpy.types.Panel):
         sublayout.prop(operator, "use_selection")
         sublayout.prop(operator, "use_visible")
         sublayout.prop(operator, "use_active_collection")
+        sublayout.prop(operator, "toggle_ko_unity_objects")
 
         layout.column().prop(operator, "object_types")
         layout.prop(operator, "use_custom_props")
