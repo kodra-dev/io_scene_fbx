@@ -606,10 +606,10 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('KO_ACTIONS', "Ko Actions", "Each prefixed action as a file with auto-naming and auto-range."),
                    ),
             )
-    ko_actions_prefix: StringProperty(
-            name="Ko Action Prefix",
-            description="Prefix for action names to export in 'Ko Actions' batch mode",
-            default="CLIP_",
+    ko_actions_prefixes: StringProperty(
+            name="Ko Action Prefixes",
+            description="Prefixes for action names to export in 'Ko Actions' batch mode (comma separated))",
+            default="CLIP_T_, CLIP_Z_,",
     )
     ko_master_name: StringProperty(
             name="Ko Master Name",
@@ -664,13 +664,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     def execute(self, context):
         obj = context.object
         if self.batch_mode == 'OFF':
-            action = None
-            if obj and obj.animation_data and obj.animation_data.action:
-                action = obj.animation_data.action 
-                start = action.frame_range[0]
-                end = action.frame_range[1]
-                context.scene.frame_start = int(start)
-                context.scene.frame_end = int(end)
+            set_scene_frame_range_by_active_action(context, obj)
         
         
         from mathutils import Matrix
@@ -710,11 +704,9 @@ def toggle_visibility_for_ko_unity_objects(context, ko_master_name, for_clip):
             continue
 
         prefix = get_prefix(obj.name)
-        print("Name: " + obj.name + "  Prefix: " + str(prefix))
 
         if obj.type == 'ARMATURE':
             if prefix == "DEF_" or prefix == "GAME_":
-                print("Exporting armature: " + obj.name)
                 obj.hide_set(False)
             else:
                 obj.hide_set(True)
@@ -770,7 +762,7 @@ class FBX_PT_export_main(bpy.types.Panel):
         row.prop(operator, "batch_mode")
         if operator.batch_mode == 'KO_ACTIONS':
             row = layout.row(align=True)
-            row.prop(operator, "ko_actions_prefix")
+            row.prop(operator, "ko_actions_prefixes")
         else:
             sub = row.row(align=True)
             sub.prop(operator, "use_batch_own_dir", text="", icon='NEWFOLDER')
@@ -800,7 +792,7 @@ class FBX_PT_export_include(bpy.types.Panel):
         operator = sfile.active_operator
 
         sublayout = layout.column(heading="Limit to")
-        sublayout.enabled = (operator.batch_mode == 'OFF')
+        sublayout.enabled = (operator.batch_mode == 'OFF' or operator.batch_mode == 'KO_ACTIONS')
         sublayout.prop(operator, "use_selection")
         sublayout.prop(operator, "use_visible")
         sublayout.prop(operator, "use_active_collection")

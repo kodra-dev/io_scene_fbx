@@ -47,10 +47,35 @@ def get_prefix(s):
     else:
         return None
 
-
 def get_master_name(context):
     # Return the current collection name
     if context.collection:
         return context.collection.name
     else:
         return None
+
+def get_all_actions(obj):
+    actions = []
+
+    # Get action from object animation data
+    if obj.animation_data:
+        if obj.animation_data.action:
+            actions.append(obj.animation_data.action)
+
+        # Get all actions from NLA tracks
+        for nla_track in obj.animation_data.nla_tracks:
+            for strip in nla_track.strips:
+                if strip.action:
+                    actions.append(strip.action)
+
+    return actions
+
+def match_any_prefix(s, prefixes_str):
+    prefixes = [p.strip() for p in prefixes_str.split(",") if p.strip()]
+    return any(s.startswith(prefix) for prefix in prefixes)
+
+def set_scene_frame_range_by_active_action(context, obj):
+    if obj and obj.animation_data and obj.animation_data.action:
+        action = obj.animation_data.action 
+        context.scene.frame_start = int(action.frame_range[0])
+        context.scene.frame_end = int(action.frame_range[1])

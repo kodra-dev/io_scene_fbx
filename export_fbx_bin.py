@@ -3177,6 +3177,7 @@ def defaults_unity3d():
         "batch_mode": 'OFF',
     }
 
+from .ko_utils import *
 
 def save(operator, context,
          filepath="",
@@ -3201,7 +3202,7 @@ def save(operator, context,
         org_mode = active_object.mode
         bpy.ops.object.mode_set(mode='OBJECT')
 
-    if batch_mode == 'OFF':
+    if batch_mode == 'OFF' or batch_mode == "KO_ACTIONS":
         kwargs_mod = kwargs.copy()
         if use_active_collection:
             if use_selection:
@@ -3219,8 +3220,26 @@ def save(operator, context,
             ctx_objects = tuple(obj for obj in ctx_objects if obj.visible_get())
         kwargs_mod["context_objects"] = ctx_objects
 
-        depsgraph = context.evaluated_depsgraph_get()
-        ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
+        if batch_mode == 'OFF':
+            depsgraph = context.evaluated_depsgraph_get()
+            ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
+        elif batch_mode == 'KO_ACTIONS':
+            obj = context.object
+            actions = [a for a in get_all_actions(obj) if match_any_prefix(a.name, kwargs_mod["ko_actions_prefixes"])]
+            
+            for action in actions:
+                obj.animation_data.action = action
+                set_scene_frame_range_by_active_action(context, obj)
+                print("action: ", action.name,
+                      "frame range: (" + str(context.scene.frame_start) + ", " + str(context.scene.frame_end) + ")")
+                print("export to: ", filepath)
+                depsgraph = context.evaluated_depsgraph_get()
+                export_dir = os.path.dirname(filepath)
+                filepath = action_to_export_path(action, kwargs_mod["ko_master_name"], export_dir)
+                ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
+            
+            
+            
     else:
         # XXX We need a way to generate a depsgraph for inactive view_layers first...
         # XXX Also, what to do in case of batch-exporting scenes, when there is more than one view layer?
