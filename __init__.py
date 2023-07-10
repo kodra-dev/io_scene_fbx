@@ -712,11 +712,9 @@ def toggle_visibility_for_ko_unity_objects(context):
                 obj.hide_set(False)
         elif obj.type == 'MESH':
             # If one of its ancestors (not limited to direct parent) is an armature
-            # continue
             if has_armature_ancestor(obj):
                 prefix = obj.name.split("_")[0]
                 if (not prefix) or (not prefix.isupper()) or prefix == collection_name or prefix == "GAME":
-                    print(obj.name, prefix)
                     obj.hide_set(False)
                     
 
