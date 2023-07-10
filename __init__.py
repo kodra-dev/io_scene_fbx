@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+from .ko_utils import *
+
 bl_info = {
     "name": "FBX format",
     "author": "Campbell Barton, Bastien Montagne, Jens Restemeier",
@@ -633,10 +635,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
 
         # Get the directory of self.filepath, if it exists.
         if self.filepath:
-            directory = os.path.dirname(self.filepath)
+            export_dir = os.path.dirname(self.filepath)
         else:
             # Set directory to the current .blend file's directory.
-            directory = os.path.dirname(bpy.data.filepath)
+            export_dir = os.path.dirname(bpy.data.filepath)
+            export_dir = to_hdg_directory_if_exists(export_dir)
 
         # Get the current object's current action's name, if any
         action_name = ""
@@ -652,7 +655,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                 
             # Append the action name to the directory
             filename = f"{collection_name}_{action_name}" + ".fbx"
-            filepath = os.path.join(directory, filename)
+            filepath = os.path.join(export_dir, filename)
          
             self.filepath = filepath
 
@@ -685,7 +688,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         keywords["global_matrix"] = global_matrix
 
         if self.toggle_ko_unity_objects:
-            toggle_visibility_for_ko_unity_objects(context)
+            toggle_visibility_for_ko_unity_objects(context, self.bake_anim)
 
         # TODO: batch mode export for ko actions
         #       perhaps we should implement it in export_fbx_bin.py
@@ -695,7 +698,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         return export_fbx_bin.save(self, context, **keywords)
 
 
-def toggle_visibility_for_ko_unity_objects(context):
+def toggle_visibility_for_ko_unity_objects(context, for_clip):
     # For objects in current collection AND current view layer
     collection_objs = context.collection.all_objects
     view_layer_objs = context.view_layer.objects
@@ -705,12 +708,17 @@ def toggle_visibility_for_ko_unity_objects(context):
     for obj in collection_objs:
         if not (obj.name in view_layer_objs):
             continue
-        # If obj is armature
-        obj.hide_set(True)
+
         if obj.type == 'ARMATURE':
             if obj.name.startswith("DEF_") or obj.name.startswith("GAME_"):
                 obj.hide_set(False)
+            else:
+                obj.hide_set(True)
         elif obj.type == 'MESH':
+            if for_clip:
+                continue
+
+            obj.hide_set(True)
             # If one of its ancestors (not limited to direct parent) is an armature
             if has_armature_ancestor(obj):
                 prefix = obj.name.split("_")[0]
