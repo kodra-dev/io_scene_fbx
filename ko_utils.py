@@ -19,7 +19,8 @@ def to_hdg_directory_if_exists(path):
         # Insert "Media" before "models"
         if "models" in parts:
             models_index = parts.index("models")
-            parts.insert(models_index, "Media")
+            if parts[models_index - 1] != "Media":
+                parts.insert(models_index, "Media")
         # Join the parts back together
         new_path = os.sep.join(parts)
         # Check if the new directory exists
