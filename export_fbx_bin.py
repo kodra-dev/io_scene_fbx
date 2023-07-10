@@ -3224,20 +3224,25 @@ def save(operator, context,
             depsgraph = context.evaluated_depsgraph_get()
             ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
         elif batch_mode == 'KO_ACTIONS':
+            wm = context.window_manager
             obj = context.object
             actions = [a for a in get_all_actions(obj) if match_any_prefix(a.name, kwargs_mod["ko_actions_prefixes"])]
+
+            wm.progress_begin(0, len(actions))
             
-            for action in actions:
+            for i, action in enumerate(actions):
                 obj.animation_data.action = action
                 set_scene_frame_range_by_active_action(context, obj)
-                print("action: ", action.name,
-                      "frame range: (" + str(context.scene.frame_start) + ", " + str(context.scene.frame_end) + ")")
+                print("==================== Exporting action: ", action.name, " ====================")
+                print("frame range: (" + str(context.scene.frame_start) + ", " + str(context.scene.frame_end) + ")")
                 print("export to: ", filepath)
                 depsgraph = context.evaluated_depsgraph_get()
                 export_dir = os.path.dirname(filepath)
                 filepath = action_to_export_path(action, kwargs_mod["ko_master_name"], export_dir)
                 ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
+                wm.progress_update(i)
             
+            wm.progress_end()
             
             
     else:
