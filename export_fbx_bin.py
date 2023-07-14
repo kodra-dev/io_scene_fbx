@@ -2883,7 +2883,7 @@ def fbx_definitions_elements(root, scene_data):
     fbx_templates_generate(definitions, scene_data.templates)
 
 
-def fbx_objects_elements(root, scene_data):
+def fbx_objects_elements(root, scene_data, skip_mesh=False):
     """
     Data (objects, geometry, material, textures, armatures, etc.).
     """
@@ -2909,10 +2909,13 @@ def fbx_objects_elements(root, scene_data):
     perfmon.step("FBX export fetch meshes (%d)..."
                  % len({me_key for me_key, _me, _free in scene_data.data_meshes.values()}))
 
-    done_meshes = set()
-    for me_obj in scene_data.data_meshes:
-        fbx_data_mesh_elements(objects, me_obj, scene_data, done_meshes)
-    del done_meshes
+    if not skip_mesh:
+        done_meshes = set()
+        for me_obj in scene_data.data_meshes:
+            fbx_data_mesh_elements(objects, me_obj, scene_data, done_meshes)
+        del done_meshes
+    else:
+        print("Skipping mesh export")
 
     perfmon.step("FBX export fetch objects (%d)..." % len(scene_data.objects))
 
@@ -3112,7 +3115,7 @@ def save_single(operator, scene, depsgraph, filepath="",
     fbx_definitions_elements(root, scene_data)
 
     # Actual data.
-    fbx_objects_elements(root, scene_data)
+    fbx_objects_elements(root, scene_data, kwargs.get('is_ko_action', False))
 
     # How data are inter-connected.
     fbx_connections_elements(root, scene_data)
@@ -3239,6 +3242,7 @@ def save(operator, context,
                 depsgraph = context.evaluated_depsgraph_get()
                 export_dir = os.path.dirname(filepath)
                 filepath = action_to_export_path(action, kwargs_mod["ko_master_name"], export_dir)
+                kwargs_mod['is_ko_action'] = True
                 ret = save_single(operator, context.scene, depsgraph, filepath, **kwargs_mod)
                 wm.progress_update(i)
             

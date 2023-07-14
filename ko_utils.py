@@ -60,7 +60,7 @@ def get_all_actions(obj):
     # Get action from object animation data
     if obj.animation_data:
         if obj.animation_data.action:
-            actions.append(obj.animation_data.action)
+            actions.add(obj.animation_data.action)
 
         # Get all actions from NLA tracks
         for nla_track in obj.animation_data.nla_tracks:
