@@ -711,7 +711,7 @@ def toggle_visibility_for_ko_unity_objects(context, ko_master_name, for_clip):
             else:
                 obj.hide_set(True)
         elif obj.type == 'MESH':
-            if for_clip:
+            if "backup" in obj.name.lower():
                 continue
 
             obj.hide_set(True)

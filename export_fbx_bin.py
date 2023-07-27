@@ -2390,6 +2390,10 @@ def fbx_data_from_scene(scene, depsgraph, settings):
             data = (channel_key, geom_key, shape_verts_co, shape_verts_idx)
             data_deformers_shape.setdefault(me, (me_key, shapes_key, {}))[2][shape] = data
 
+    print("--- data_deformers_shape ---")
+    print(data_deformers_shape)
+    print("--- data_deformers_shape ---")
+
     perfmon.step("FBX export prepare: Wrapping Armatures...")
 
     # Armatures!
@@ -2909,13 +2913,11 @@ def fbx_objects_elements(root, scene_data, skip_mesh=False):
     perfmon.step("FBX export fetch meshes (%d)..."
                  % len({me_key for me_key, _me, _free in scene_data.data_meshes.values()}))
 
-    if not skip_mesh:
-        done_meshes = set()
-        for me_obj in scene_data.data_meshes:
-            fbx_data_mesh_elements(objects, me_obj, scene_data, done_meshes)
-        del done_meshes
-    else:
-        print("Skipping mesh export")
+    # We don't actually skip mesh because that doesn't work with blend shapes.
+    done_meshes = set()
+    for me_obj in scene_data.data_meshes:
+        fbx_data_mesh_elements(objects, me_obj, scene_data, done_meshes)
+    del done_meshes
 
     perfmon.step("FBX export fetch objects (%d)..." % len(scene_data.objects))
 
