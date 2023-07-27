@@ -1981,8 +1981,13 @@ def fbx_animations_do(scene_data, ref_id, f_start, f_end, start_zero, objects=No
         real_currframe = currframe - f_start if start_zero else currframe
         scene.frame_set(int(currframe), subframe=currframe - int(currframe))
 
-        for dp_obj in ob_obj.dupli_list_gen(depsgraph):
-            pass  # Merely updating dupli matrix of ObjectWrapper...
+        try:
+            # Fuck Blender. Seriously.
+            for dp_obj in ob_obj.dupli_list_gen(depsgraph):
+                pass  # Merely updating dupli matrix of ObjectWrapper...
+        except UnboundLocalError:
+            pass
+
         for ob_obj, (anim_loc, anim_rot, anim_scale) in animdata_ob.items():
             # We compute baked loc/rot/scale for all objects (rot being euler-compat with previous value!).
             p_rot = p_rots.get(ob_obj, None)
@@ -2389,10 +2394,6 @@ def fbx_data_from_scene(scene, depsgraph, settings):
             channel_key, geom_key = get_blender_mesh_shape_channel_key(me, shape)
             data = (channel_key, geom_key, shape_verts_co, shape_verts_idx)
             data_deformers_shape.setdefault(me, (me_key, shapes_key, {}))[2][shape] = data
-
-    print("--- data_deformers_shape ---")
-    print(data_deformers_shape)
-    print("--- data_deformers_shape ---")
 
     perfmon.step("FBX export prepare: Wrapping Armatures...")
 

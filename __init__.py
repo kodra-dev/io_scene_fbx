@@ -662,6 +662,8 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
 
 
     def execute(self, context):
+        set_report(self.report)
+
         obj = context.object
         if self.batch_mode == 'OFF':
             set_scene_frame_range_by_active_action(context, obj)
@@ -683,15 +685,45 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
 
         keywords["global_matrix"] = global_matrix
 
+        active_obj, selected_objs = store_selection_state()
+
         if self.toggle_ko_unity_objects:
             toggle_visibility_for_ko_unity_objects(context, self.ko_master_name, self.bake_anim)
 
-        # TODO: batch mode export for ko actions
-        #       perhaps we should implement it in export_fbx_bin.py
-        #       and how to handle auto-range?
+        if operator_exists("ko.safe_split"):
+            split_meshes = []
+            # find all visible mesh objs
+            mesh_objs = [obj for obj in context.view_layer.objects if obj.type == 'MESH' and not obj.hide_get()]
+            for m in mesh_objs:
+
+                # check if there is a vertex group starting with "SPLIT_"
+                has_to_split = False
+                for vg in m.vertex_groups:
+                    if vg.name.startswith("SPLIT_"):
+                        has_to_split = True
+
+                # if so, split the mesh
+                if has_to_split:
+                    # try to select m
+                    select_succeeded = ensure_single_selected(m.name)
+                    if select_succeeded:
+                        split_meshes.append(m.name)
+                        bpy.ops.ko.safe_split()
+        else:
+            self.report({'ERROR'}, "ko.safe_split operator not found. Please install the ko_rigging addon.")
+
+        restore_selection_state(active_obj, selected_objs)
 
         from . import export_fbx_bin
-        return export_fbx_bin.save(self, context, **keywords)
+        ret = export_fbx_bin.save(self, context, **keywords)
+
+        for mn in split_meshes:
+            ensure_single_selected(mn)
+            bpy.ops.ko.restore_split()
+        
+        restore_selection_state(active_obj, selected_objs)
+
+        return ret
 
 
 def toggle_visibility_for_ko_unity_objects(context, ko_master_name, for_clip):

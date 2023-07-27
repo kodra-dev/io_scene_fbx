@@ -1,7 +1,11 @@
 import os
 import re
+import bpy
 
 
+def set_report(r):
+    global report
+    report = r
 
 # Convert a directory from "raw" to "asset"
 # For example:
@@ -79,3 +83,63 @@ def set_scene_frame_range_by_active_action(context, obj):
         action = obj.animation_data.action 
         context.scene.frame_start = int(action.frame_range[0])
         context.scene.frame_end = int(action.frame_range[1])
+
+def operator_exists(operator_path):
+    operator = bpy.ops
+    for part in operator_path.split("."):
+        if hasattr(operator, part):
+            operator = getattr(operator, part)
+        else:
+            return False
+    return operator.poll() is not None
+
+def store_selection_state():
+    # Store active object
+    # For some reason context.active_object just doesn't work
+    active_obj = bpy.context.object
+
+    # Store selected objects
+    selected_objects = bpy.context.selected_objects.copy()
+
+    return active_obj, selected_objects
+
+
+def restore_selection_state(active_obj, selected_objects):
+    
+    # Restore active object
+    was_visible = active_obj.visible_get()
+    active_obj.hide_set(False)
+    bpy.context.view_layer.objects.active = active_obj
+    active_obj.hide_set(not was_visible)
+
+    mode = bpy.context.object.mode
+    if mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Deselect all objects
+    bpy.ops.object.select_all(action='DESELECT')
+
+    # Restore selected objects
+    for obj in selected_objects:
+        obj.select_set(True)
+
+    # Restore the mode
+    if mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode=mode)
+
+
+def ensure_single_selected(obj_name):
+    # Deselect all objects
+    for obj in bpy.data.objects:
+        obj.select_set(False)
+        
+    # Select and activate the desired object
+    if obj_name in bpy.data.objects:
+        bpy.data.objects[obj_name].select_set(True)
+        bpy.context.view_layer.objects.active = bpy.data.objects[obj_name]
+        return True
+    else:
+        return False
+
+def object_exists(obj):
+    return obj is not None and obj.name in bpy.data.objects and bpy.data.objects[obj.name]
