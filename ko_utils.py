@@ -107,10 +107,11 @@ def store_selection_state():
 def restore_selection_state(active_obj, selected_objects):
     
     # Restore active object
-    was_visible = active_obj.visible_get()
-    active_obj.hide_set(False)
-    bpy.context.view_layer.objects.active = active_obj
-    active_obj.hide_set(not was_visible)
+    if active_obj is not None:
+        was_visible = active_obj.visible_get()
+        active_obj.hide_set(False)
+        bpy.context.view_layer.objects.active = active_obj
+        active_obj.hide_set(not was_visible)
 
     mode = bpy.context.object.mode
     if mode != 'OBJECT':
