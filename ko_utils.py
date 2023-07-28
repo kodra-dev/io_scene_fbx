@@ -113,20 +113,23 @@ def restore_selection_state(active_obj, selected_objects):
         bpy.context.view_layer.objects.active = active_obj
         active_obj.hide_set(not was_visible)
 
-    mode = bpy.context.object.mode
-    if mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode='OBJECT')
+    o = bpy.context.object
+    if o:
+        mode = o.mode
+        if mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Deselect all objects
-    bpy.ops.object.select_all(action='DESELECT')
+        # Deselect all objects
+        bpy.ops.object.select_all(action='DESELECT')
 
     # Restore selected objects
     for obj in selected_objects:
         obj.select_set(True)
 
-    # Restore the mode
-    if mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode=mode)
+    if o:
+        # Restore the mode
+        if mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode=mode)
 
 
 def ensure_single_selected(obj_name):
@@ -144,3 +147,14 @@ def ensure_single_selected(obj_name):
 
 def object_exists(obj):
     return obj is not None and obj.name in bpy.data.objects and bpy.data.objects[obj.name]
+
+
+def leave_local_view():
+    for area in bpy.context.screen.areas:
+        if area.type == 'VIEW_3D':
+            space = area.spaces[0]
+            if space.local_view: #check if using local view
+                for region in area.regions:
+                    if region.type == 'WINDOW':
+                        override = {'area': area, 'region': region} #override context
+                        bpy.ops.view3d.localview(override) #switch to global view

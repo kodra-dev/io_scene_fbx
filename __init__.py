@@ -685,12 +685,15 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
 
         keywords["global_matrix"] = global_matrix
 
-        active_obj, selected_objs = store_selection_state()
 
         if self.toggle_ko_unity_objects:
+            leave_local_view()
+            
             toggle_visibility_for_ko_unity_objects(context, self.ko_master_name, self.bake_anim)
 
-        if operator_exists("ko.safe_split"):
+        if operator_exists("ko.safe_split") and self.toggle_ko_unity_objects:
+            active_obj, selected_objs = store_selection_state()
+
             split_meshes = []
             # find all visible mesh objs
             mesh_objs = [obj for obj in context.view_layer.objects if obj.type == 'MESH' and not obj.hide_get()]
@@ -709,19 +712,25 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                     if select_succeeded:
                         split_meshes.append(m.name)
                         bpy.ops.ko.safe_split()
+
+            restore_selection_state(active_obj, selected_objs)
         else:
             self.report({'ERROR'}, "ko.safe_split operator not found. Please install the ko_rigging addon.")
-
-        restore_selection_state(active_obj, selected_objs)
 
         from . import export_fbx_bin
         ret = export_fbx_bin.save(self, context, **keywords)
 
-        for mn in split_meshes:
-            ensure_single_selected(mn)
-            bpy.ops.ko.restore_split()
+        if operator_exists("ko.restore_split"):
+            active_obj, selected_objs = store_selection_state()
+
+            for mn in split_meshes:
+                ensure_single_selected(mn)
+                bpy.ops.ko.restore_split()
+
+            restore_selection_state(active_obj, selected_objs)
+        else:
+            self.report({'ERROR'}, "ko.restore_split operator not found. Please install the ko_rigging addon.")
         
-        restore_selection_state(active_obj, selected_objs)
 
         return ret
 
