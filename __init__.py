@@ -1,14 +1,13 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
-
 from .ko_utils import *
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 bl_info = {
     "name": "FBX format",
-    "author": "Campbell Barton, Bastien Montagne, Jens Restemeier",
-    "version": (4, 36, 3),
-    "blender": (3, 2, 0),
+    "author": "Campbell Barton, Bastien Montagne, Jens Restemeier, @Mysteryem",
+    "version": (5, 4, 0),
+    "blender": (3, 6, 0),
     "location": "File > Import-Export",
-    "description": "FBX IO meshes, UV's, vertex colors, materials, textures, cameras, lamps and actions",
+    "description": "FBX IO meshes, UVs, vertex colors, materials, textures, cameras, lamps and actions",
     "warning": "",
     "doc_url": "{BLENDER_MANUAL_URL}/addons/import_export/scene_fbx.html",
     "support": 'OFFICIAL',
@@ -82,7 +81,7 @@ class ImportFBX(bpy.types.Operator, ImportHelper):
             name="Apply Transform",
             description="Bake space transform into object data, avoids getting unwanted rotations to objects when "
                         "target space is not aligned with Blender's space "
-                        "(WARNING! experimental option, use at own risks, known broken with armatures/animations)",
+                        "(WARNING! experimental option, use at own risk, known to be broken with armatures/animations)",
             default=False,
             )
 
@@ -90,6 +89,15 @@ class ImportFBX(bpy.types.Operator, ImportHelper):
             name="Custom Normals",
             description="Import custom normals, if available (otherwise Blender will recompute them)",
             default=True,
+            )
+    colors_type: EnumProperty(
+            name="Vertex Colors",
+            items=(('NONE', "None", "Do not import color attributes"),
+                   ('SRGB', "sRGB", "Expect file colors in sRGB color space"),
+                   ('LINEAR', "Linear", "Expect file colors in linear color space"),
+                   ),
+            description="Import vertex color attributes",
+            default='SRGB',
             )
 
     use_image_search: BoolProperty(
@@ -232,6 +240,7 @@ class FBX_PT_import_include(bpy.types.Panel):
         sub.enabled = operator.use_custom_props
         sub.prop(operator, "use_custom_props_enum_as_string")
         layout.prop(operator, "use_image_search")
+        layout.prop(operator, "colors_type")
 
 
 class FBX_PT_import_transform(bpy.types.Panel):
@@ -393,7 +402,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Make all Ko Unity objects *in current collection* visible before exporting",
             default=False,
     )
-            
+
     global_scale: FloatProperty(
             name="Scale",
             description="Scale all data (Some importers do not support scaled armatures!)",
@@ -432,7 +441,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             name="Apply Transform",
             description="Bake space transform into object data, avoids getting unwanted rotations to objects when "
                         "target space is not aligned with Blender's space "
-                        "(WARNING! experimental option, use at own risks, known broken with armatures/animations)",
+                        "(WARNING! experimental option, use at own risk, known to be broken with armatures/animations)",
             default=False,
             )
 
@@ -470,6 +479,21 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Export smoothing information "
                         "(prefer 'Normals Only' option if your target importer understand split normals)",
             default='OFF',
+            )
+    colors_type: EnumProperty(
+            name="Vertex Colors",
+            items=(('NONE', "None", "Do not export color attributes"),
+                   ('SRGB', "sRGB", "Export colors in sRGB color space"),
+                   ('LINEAR', "Linear", "Export colors in linear color space"),
+                   ),
+            description="Export vertex color attributes",
+            default='SRGB',
+            )
+    prioritize_active_color: BoolProperty(
+            name="Prioritize Active Color",
+            description="Make sure active color will be exported first. Could be important "
+                        "since some other software can discard other color attributes besides the first one",
+            default=False,
             )
     use_subsurf: BoolProperty(
             name="Export Subdivision Surface",
@@ -538,8 +562,8 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('LIMBNODE', "LimbNode", "'LimbNode' FBX node, a regular joint between two bones..."),
                   ),
             description="FBX type of node (object) used to represent Blender's armatures "
-                        "(use Null one unless you experience issues with other app, other choices may no import back "
-                        "perfectly in Blender...)",
+                        "(use the Null type unless you experience issues with the other app, "
+                        "as other choices may not import back perfectly into Blender...)",
             default='NULL',
             )
     bake_anim: BoolProperty(
@@ -606,6 +630,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('KO_ACTIONS', "Ko Actions", "Each prefixed action as a file with auto-naming and auto-range."),
                    ),
             )
+    
     ko_actions_prefixes: StringProperty(
             name="Ko Action Prefixes",
             description="Prefixes for action names to export in 'Ko Actions' batch mode (comma separated))",
@@ -616,6 +641,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Name of the master collection that would be prepended to the exported Ko Actions file names",
             default="",
     )
+            
     use_batch_own_dir: BoolProperty(
             name="Batch Own Dir",
             description="Create a dir for each exported file",
@@ -633,7 +659,6 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     @property
     def check_extension(self):
         return self.batch_mode == 'OFF'
-
 
     def invoke(self, context, event):
         import os
@@ -667,8 +692,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         obj = context.object
         if self.batch_mode == 'OFF':
             set_scene_frame_range_by_active_action(context, obj)
-        
-        
+
         from mathutils import Matrix
         if not self.filepath:
             raise Exception("filepath not set")
@@ -684,7 +708,6 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                                             ))
 
         keywords["global_matrix"] = global_matrix
-
 
         if self.toggle_ko_unity_objects:
             leave_local_view()
@@ -717,6 +740,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         else:
             self.report({'ERROR'}, "ko.safe_split operator not found. Please install the ko_rigging addon.")
 
+
         from . import export_fbx_bin
         ret = export_fbx_bin.save(self, context, **keywords)
 
@@ -730,7 +754,6 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             restore_selection_state(active_obj, selected_objs)
         else:
             self.report({'ERROR'}, "ko.restore_split operator not found. Please install the ko_rigging addon.")
-        
 
         return ret
 
@@ -769,7 +792,6 @@ def has_armature_ancestor(obj):
         return True
     else:
         return has_armature_ancestor(obj.parent)
-                
 
 
 class FBX_PT_export_main(bpy.types.Panel):
@@ -838,6 +860,7 @@ class FBX_PT_export_include(bpy.types.Panel):
         sublayout.prop(operator, "use_visible")
         sublayout.prop(operator, "use_active_collection")
         sublayout.prop(operator, "toggle_ko_unity_objects")
+
 
         layout.column().prop(operator, "object_types")
         layout.prop(operator, "use_custom_props")
@@ -910,6 +933,8 @@ class FBX_PT_export_geometry(bpy.types.Panel):
         sub = layout.row()
         #~ sub.enabled = operator.mesh_smooth_type in {'OFF'}
         sub.prop(operator, "use_tspace")
+        layout.prop(operator, "colors_type")
+        layout.prop(operator, "prioritize_active_color")
 
 
 class FBX_PT_export_armature(bpy.types.Panel):
