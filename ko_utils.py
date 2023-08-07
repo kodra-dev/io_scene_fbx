@@ -104,6 +104,15 @@ def store_selection_state():
     return active_obj, selected_objects
 
 
+def is_object_removed(obj):
+    try:
+        # Just accessing the name will raise a ReferenceError if the object is deleted
+        _ = obj.name
+        return False
+    except ReferenceError:
+        return True
+
+
 def restore_selection_state(active_obj, selected_objects):
     
     # Restore active object
@@ -113,20 +122,23 @@ def restore_selection_state(active_obj, selected_objects):
         bpy.context.view_layer.objects.active = active_obj
         active_obj.hide_set(not was_visible)
 
-    o = bpy.context.object
+    o = bpy.context.active_object
+    changed_mode = False
     if o:
         mode = o.mode
         if mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
+            changed_mode = True
 
         # Deselect all objects
         bpy.ops.object.select_all(action='DESELECT')
 
     # Restore selected objects
     for obj in selected_objects:
-        obj.select_set(True)
+        if not is_object_removed(obj):
+            obj.select_set(True)
 
-    if o:
+    if changed_mode:
         # Restore the mode
         if mode != 'OBJECT':
             bpy.ops.object.mode_set(mode=mode)

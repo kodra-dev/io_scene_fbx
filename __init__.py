@@ -714,10 +714,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             
             toggle_visibility_for_ko_unity_objects(context, self.ko_master_name, self.bake_anim)
 
+        split_meshes = []
+
         if operator_exists("ko.safe_split") and self.toggle_ko_unity_objects:
             active_obj, selected_objs = store_selection_state()
 
-            split_meshes = []
             # find all visible mesh objs
             mesh_objs = [obj for obj in context.view_layer.objects if obj.type == 'MESH' and not obj.hide_get()]
             for m in mesh_objs:
@@ -727,6 +728,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                 for vg in m.vertex_groups:
                     if vg.name.startswith("SPLIT_"):
                         has_to_split = True
+                has_to_split = has_to_split and m.get('SPLIT', False)
 
                 # if so, split the mesh
                 if has_to_split:
@@ -744,7 +746,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         from . import export_fbx_bin
         ret = export_fbx_bin.save(self, context, **keywords)
 
-        if operator_exists("ko.restore_split"):
+        if operator_exists("ko.restore_split") and split_meshes:
             active_obj, selected_objs = store_selection_state()
 
             for mn in split_meshes:
