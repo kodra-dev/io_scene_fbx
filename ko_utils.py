@@ -137,11 +137,20 @@ def restore_selection_state(active_obj, selected_objects):
     for obj in selected_objects:
         if not is_object_removed(obj):
             obj.select_set(True)
+    if o and not bpy.context.active_object:
+        o.select_set(True)
+        was_visible = active_obj.visible_get()
+        active_obj.hide_set(False)
+        bpy.context.view_layer.objects.active = o
+        active_obj.hide_set(not was_visible)
 
     if changed_mode:
         # Restore the mode
         if mode != 'OBJECT':
-            bpy.ops.object.mode_set(mode=mode)
+            try:
+                bpy.ops.object.mode_set(mode=mode)
+            except RuntimeError:
+                print("Could not restore mode: " + mode + " because no active object for the context. Skipping mode change.")
 
 
 def ensure_single_selected(obj_name):
